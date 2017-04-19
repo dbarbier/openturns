@@ -22,6 +22,7 @@
 #include <cmath>
 #include <iomanip>
 #include <algorithm>
+#include <set>
 
 #include "openturns/RandomMixture.hxx"
 #include "openturns/SpecFunc.hxx"
@@ -3042,20 +3043,38 @@ Sample RandomMixture::getSupport(const Interval & interval) const
     } // dimension > 1
     const UnsignedInteger supportCandidatesSize = supportCandidates.getSize();
     const UnsignedInteger nextSupportSize = nextSupport.getSize();
-    Sample newSupportCandidate(supportCandidatesSize * nextSupportSize, dimension);
-    UnsignedInteger k = 0;
+    struct CompareSampleByIndex
+    {
+        const SampleImplementation & sample_;
+        CompareSampleByIndex(const SampleImplementation & sample) : sample_(sample) {}
+        bool operator()(const int& a, const int& b) const
+        {
+            return sample_[a] < sample_[b];
+        }
+    };
+    SampleImplementation newSupportCandidates(1, dimension);
+    std::set<int, CompareSampleByIndex> supportPoints(newSupportCandidates);
+    UnsignedInteger nextIndex = 0;
+    Bool newElement = false;
     for (UnsignedInteger indexCandidates = 0; indexCandidates < supportCandidatesSize; ++indexCandidates)
     {
       const Point xI(supportCandidates[indexCandidates]);
       for (UnsignedInteger indexNext2 = 0; indexNext2 < nextSupportSize; ++indexNext2)
       {
         const Point xJ(nextSupport[indexNext2]);
-        newSupportCandidate[k] = xI + xJ;
-        ++k;
+        if (nextIndex == newSupportCandidates.getSize())
+          newSupportCandidates.add(xI + xJ);
+        else
+          newSupportCandidates[nextIndex] = xI + xJ;
+        newElement = supportPoints.insert(nextIndex).second;
+        if (newElement)
+          ++nextIndex;
       } // indexNext2
     } // indexCandidates
-    // Remove duplicates
-    supportCandidates = newSupportCandidate.sortUnique();
+    UnsignedInteger k = 0;
+    supportCandidates = Sample(supportPoints.size(), dimension);
+    for (std::set<int, CompareSampleByIndex>::const_iterator it = supportPoints.begin(); it != supportPoints.end(); ++it, ++k)
+      supportCandidates[k] = newSupportCandidates[*it];
   } // loop over the other atoms
   for (UnsignedInteger i = 0; i < supportCandidates.getSize(); ++i)
   {
