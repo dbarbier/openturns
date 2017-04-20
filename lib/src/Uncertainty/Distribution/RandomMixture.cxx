@@ -22,6 +22,7 @@
 #include <cmath>
 #include <iomanip>
 #include <algorithm>
+#include <unordered_set>
 
 #include "openturns/RandomMixture.hxx"
 #include "openturns/SpecFunc.hxx"
@@ -3027,6 +3028,32 @@ Sample RandomMixture::getSupport(const Interval & interval) const
     for (UnsignedInteger i = 0; i < support0.getSize(); ++i)
       supportCandidates[i] = scaling * support0[i][0] + constant_;
   } // dimension > 1
+  struct HashSampleByIndex
+  {
+      const SampleImplementation & sample_;
+      HashSampleByIndex(const SampleImplementation & sample) : sample_(sample) {}
+      std::size_t operator()(const int& a) const
+      {
+          const NSI_const_point point(sample_[a]);
+          std::size_t hash = 0;
+          for(UnsignedInteger i = 0; i < point.getDimension(); ++i)
+              hash ^= std::hash<Scalar>()(point[i]) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+          return hash;
+      }
+  };
+  struct EqualSampleByIndex
+  {
+      const SampleImplementation & sample_;
+      EqualSampleByIndex(const SampleImplementation & sample) : sample_(sample) {}
+      bool operator()(const int& lhs, const int& rhs) const
+      {
+          return sample_[lhs] == sample_[rhs];
+      }
+  };
+  SampleImplementation newSupportCandidates(0, dimension);
+  typedef std::unordered_set<int, HashSampleByIndex, EqualSampleByIndex> MyContainer;
+  MyContainer supportPoints(5, HashSampleByIndex(newSupportCandidates), EqualSampleByIndex(newSupportCandidates));
+
   for (UnsignedInteger indexNext = 1; indexNext < size; ++indexNext)
   {
     Sample nextSupport;
@@ -3042,27 +3069,39 @@ Sample RandomMixture::getSupport(const Interval & interval) const
     } // dimension > 1
     const UnsignedInteger supportCandidatesSize = supportCandidates.getSize();
     const UnsignedInteger nextSupportSize = nextSupport.getSize();
-    Sample newSupportCandidate(supportCandidatesSize * nextSupportSize, dimension);
-    UnsignedInteger k = 0;
+
+    newSupportCandidates.clear();
+    supportPoints.clear();
+    supportPoints.reserve(std::max(supportCandidatesSize, nextSupportSize));
+
+    UnsignedInteger nextIndex = 0;
+    Bool newElement = true;
     for (UnsignedInteger indexCandidates = 0; indexCandidates < supportCandidatesSize; ++indexCandidates)
     {
       const Point xI(supportCandidates[indexCandidates]);
       for (UnsignedInteger indexNext2 = 0; indexNext2 < nextSupportSize; ++indexNext2)
       {
         const Point xJ(nextSupport[indexNext2]);
-        newSupportCandidate[k] = xI + xJ;
-        ++k;
+        if (nextIndex == newSupportCandidates.getSize())
+          newSupportCandidates.add(xI + xJ);
+        else
+          newSupportCandidates[nextIndex] = xI + xJ;
+        newElement = supportPoints.insert(nextIndex).second;
+        if (newElement)
+          ++nextIndex;
       } // indexNext2
     } // indexCandidates
-    // Remove duplicates
-    supportCandidates = newSupportCandidate.sortUnique();
+    UnsignedInteger k = 0;
+    supportCandidates = Sample(supportPoints.size(), dimension);
+    for (MyContainer::const_iterator it = supportPoints.begin(); it != supportPoints.end(); ++it, ++k)
+      supportCandidates[k] = newSupportCandidates[*it];
   } // loop over the other atoms
   for (UnsignedInteger i = 0; i < supportCandidates.getSize(); ++i)
   {
     const Point candidate(supportCandidates[i]);
     if (interval.contains(candidate)) support.add(candidate);
   }
-  return support;
+  return support.sort();
 }
 
 /* Method save() stores the object through the StorageManager */
