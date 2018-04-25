@@ -71,6 +71,7 @@ String CopulaImplementation::__repr__() const
 
 Scalar CopulaImplementation::computeSurvivalFunction(const Point & point) const
 {
+  if (!isCopula_) return ContinuousDistribution::computeSurvivalFunction(point);
   const UnsignedInteger dimension = getDimension();
   if (dimension == 1) return computeComplementaryCDF(point);
   Bool allOutside = true;
@@ -106,6 +107,7 @@ Scalar CopulaImplementation::computeSurvivalFunction(const Point & point) const
 Point CopulaImplementation::computeQuantile(const Scalar prob,
     const Bool tail) const
 {
+  if (!isCopula_) return ContinuousDistribution::computeQuantile(prob, tail);
   const UnsignedInteger dimension = getDimension();
   // Special case for bording values
   const Scalar q = tail ? 1.0 - prob : prob;
@@ -133,12 +135,14 @@ Point CopulaImplementation::computeQuantile(const Scalar prob,
 /* Get the mean of the copula */
 Point CopulaImplementation::getMean() const
 {
+  if (!isCopula_) return ContinuousDistribution::getMean();
   return Point(getDimension(), 0.5);
 }
 
 /* Get the standard deviation of the copula */
 Point CopulaImplementation::getStandardDeviation() const
 {
+  if (!isCopula_) return ContinuousDistribution::getStandardDeviation();
   // 0.2886751345948128822545744 = 1 / sqrt(12)
   return Point(getDimension(), 0.2886751345948128822545744);
 }
@@ -146,6 +150,7 @@ Point CopulaImplementation::getStandardDeviation() const
 /* Get the Spearman correlation of the copula */
 CorrelationMatrix CopulaImplementation::getSpearmanCorrelation() const
 {
+  if (!isCopula_) return ContinuousDistribution::getSpearmanCorrelation();
   return getLinearCorrelation();
 }
 
@@ -168,6 +173,7 @@ struct CopulaImplementationKendallTauWrapper
 /* Get the Kendall concordance of the copula */
 CorrelationMatrix CopulaImplementation::getKendallTau() const
 {
+  if (!isCopula_) return ContinuousDistribution::getKendallTau();
   const UnsignedInteger dimension = getDimension();
   CorrelationMatrix tau(dimension);
   if (hasIndependentCopula()) return tau;
@@ -206,12 +212,14 @@ CorrelationMatrix CopulaImplementation::getKendallTau() const
 /* Get the skewness of the copula */
 Point CopulaImplementation::getSkewness() const
 {
+  if (!isCopula_) return ContinuousDistribution::getSkewness();
   return Point(getDimension(), 0.0);
 }
 
 /* Get the kurtosis of the copula */
 Point CopulaImplementation::getKurtosis() const
 {
+  if (!isCopula_) return ContinuousDistribution::getKurtosis();
   // 1.8 = 9/5
   return Point(getDimension(), 1.8);
 }
@@ -235,6 +243,11 @@ struct CopulaImplementationCovarianceWrapper
 /* Compute the covariance of the copula */
 void CopulaImplementation::computeCovariance() const
 {
+  if (!isCopula_)
+  {
+    ContinuousDistribution::computeCovariance();
+    return;
+  }
   const UnsignedInteger dimension = getDimension();
   // We need this to initialize the covariance matrix in two cases:
   // + this is the first call to this routine (which could be checked by testing the dimension of the copula and the dimension of the matrix
@@ -281,6 +294,7 @@ void CopulaImplementation::computeCovariance() const
 /* Get the i-th marginal distribution */
 Distribution CopulaImplementation::getMarginal(const UnsignedInteger i) const
 {
+  if (!isCopula_) return ContinuousDistribution::getMarginal(i);
   if (i >= getDimension()) throw InvalidArgumentException(HERE) << "The index of a marginal distribution must be in the range [0, dim-1]";
   return new IndependentCopula(1);
 }
@@ -288,6 +302,7 @@ Distribution CopulaImplementation::getMarginal(const UnsignedInteger i) const
 /* Get the copula of a distribution */
 Distribution CopulaImplementation::getCopula() const
 {
+  if (!isCopula_) return ContinuousDistribution::getCopula();
   return clone();
 }
 
@@ -297,6 +312,11 @@ Distribution CopulaImplementation::getCopula() const
    outside of which the PDF is rounded to zero in double precision */
 void CopulaImplementation::computeRange()
 {
+  if (!isCopula_)
+  {
+    ContinuousDistribution::computeRange();
+    return;
+  }
   setRange(Interval(getDimension()));
 }
 
